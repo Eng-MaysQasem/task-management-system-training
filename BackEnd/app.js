@@ -4,6 +4,9 @@ var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 const cors = require('cors');
+const fs = require('fs');
+const swaggerUi = require('swagger-ui-express');
+const YAML = require('yaml');
 require("./Modules/tickets/tickets.cleanup.job");
 
 
@@ -35,6 +38,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+
+const openapiPath = path.join(__dirname, 'openapi.yaml');
+const openapiDoc = YAML.parse(fs.readFileSync(openapiPath, 'utf8'));
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(openapiDoc));
+app.get('/openapi.yaml', (req, res) => {
+  res.sendFile(openapiPath);
+});
 
 app.use('', healthRouter);
 app.use('/auth', authRouter);

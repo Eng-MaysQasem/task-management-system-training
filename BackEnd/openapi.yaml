@@ -1,0 +1,1880 @@
+openapi: 3.1.0
+info:
+  title: Task Management System API
+  version: 1.0.0
+  description: OpenAPI documentation for the Task Management System backend.
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Auth
+  - name: Tickets
+  - name: Comments
+  - name: Audit
+  - name: Profile
+  - name: Reports
+  - name: Export
+  - name: Sprints
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+            examples:
+              example:
+                value:
+                  name: "Jane Doe"
+                  email: "jane@example.com"
+                  password: "StrongPass123!"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+              examples:
+                success:
+                  value:
+                    success: true
+                    data:
+                      user:
+                        id: "1"
+                        name: "Jane Doe"
+                        email: "jane@example.com"
+                        role: "USER"
+                        plan: "FREE"
+                      accessToken: "<jwt>"
+        "409":
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                conflict:
+                  value:
+                    success: false
+                    error: "User already exists"
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login and get tokens
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            examples:
+              example:
+                value:
+                  email: "jane@example.com"
+                  password: "StrongPass123!"
+      responses:
+        "200":
+          description: Login successful
+          headers:
+            Set-Cookie:
+              description: Refresh token cookie for /auth/refresh and /auth/logout
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+              examples:
+                success:
+                  value:
+                    success: true
+                    data:
+                      user:
+                        id: "1"
+                        name: "Jane Doe"
+                        email: "jane@example.com"
+                        role: "USER"
+                      accessToken: "<jwt>"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalid:
+                  value:
+                    success: false
+                    error: "Invalid Email or Password"
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      security: []
+      parameters:
+        - in: cookie
+          name: refreshToken
+          required: true
+          schema:
+            type: string
+          description: Refresh token cookie
+      responses:
+        "200":
+          description: Token refreshed
+          headers:
+            Set-Cookie:
+              description: New refresh token cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: string
+              examples:
+                success:
+                  value:
+                    success: true
+                    data: "<jwt>"
+        "401":
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalid:
+                  value:
+                    success: false
+                    error: "Invalid Token"
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout and revoke refresh token
+      security: []
+      parameters:
+        - in: cookie
+          name: refreshToken
+          required: false
+          schema:
+            type: string
+          description: Refresh token cookie
+      responses:
+        "200":
+          description: Logged out
+          headers:
+            Set-Cookie:
+              description: Cleared refresh token cookie
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    nullable: true
+              examples:
+                success:
+                  value:
+                    success: true
+                    data: null
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request password reset
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordRequest"
+            examples:
+              example:
+                value:
+                  email: "jane@example.com"
+      responses:
+        "200":
+          description: Reset link dispatched (or silently ignored)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: string
+              examples:
+                success:
+                  value:
+                    success: true
+                    data: "Reset Link sent if email exsists"
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password with token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+            examples:
+              example:
+                value:
+                  token: "<reset-token>"
+                  newPassword: "StrongPass123!"
+      responses:
+        "200":
+          description: Password reset
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, message]
+                properties:
+                  data:
+                    nullable: true
+                  message:
+                    type: string
+              examples:
+                success:
+                  value:
+                    data: null
+                    message: "Password has been successfully reset"
+        "400":
+          description: Invalid or expired reset token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalid:
+                  value:
+                    success: false
+                    error: "Invalid or expired password reset token"
+
+  /tickets/getTickets:
+    get:
+      tags: [Tickets]
+      summary: List tickets
+      description: Returns tickets visible to the current user. Non-admin users only see tickets assigned to them in scoped backlog or sprints.
+      parameters:
+        - $ref: "#/components/parameters/ViewParam"
+        - $ref: "#/components/parameters/StatusParam"
+        - $ref: "#/components/parameters/PriorityParam"
+        - $ref: "#/components/parameters/SortByParam"
+        - $ref: "#/components/parameters/SearchParam"
+        - $ref: "#/components/parameters/AssigneeParam"
+        - $ref: "#/components/parameters/SprintIdParamQuery"
+        - $ref: "#/components/parameters/StartDateParam"
+        - $ref: "#/components/parameters/EndDateParam"
+        - $ref: "#/components/parameters/DeletedOnlyParam"
+        - $ref: "#/components/parameters/IncludeDeletedParam"
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Ticket list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketListResponse"
+              examples:
+                success:
+                  value:
+                    success: true
+                    items:
+                      - id: "101"
+                        title: "Fix login bug"
+                        description: "Investigate token refresh"
+                        status: "IN_PROGRESS"
+                        priority: "HIGH"
+                        deadline: "2026-05-31T10:00:00.000Z"
+                        deletedAt: null
+                        createdAt: "2026-05-01T10:00:00.000Z"
+                        updatedAt: "2026-05-05T10:00:00.000Z"
+                        assignee:
+                          id: "3"
+                          name: "Jane Doe"
+                          email: "jane@example.com"
+                        createdBy:
+                          id: "1"
+                          name: "Admin"
+                        sprint:
+                          id: "2"
+                          name: "Sprint 12"
+                        permissions:
+                          canEdit: true
+                          canUpdateStatus: true
+                          assignedToMe: true
+                    paginationMeta:
+                      total: 1
+                      page: 1
+                      limit: 20
+                      totalPages: 1
+
+  /tickets/{id}:
+    get:
+      tags: [Tickets]
+      summary: Get a ticket by ID
+      parameters:
+        - $ref: "#/components/parameters/TicketIdParam"
+      responses:
+        "200":
+          description: Ticket details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketSingleResponse"
+              examples:
+                success:
+                  value:
+                    success: true
+                    items:
+                      - id: "101"
+                        title: "Fix login bug"
+                        description: "Investigate token refresh"
+                        status: "IN_PROGRESS"
+                        priority: "HIGH"
+                        deadline: "2026-05-31T10:00:00.000Z"
+                        deletedAt: null
+                        createdAt: "2026-05-01T10:00:00.000Z"
+                        updatedAt: "2026-05-05T10:00:00.000Z"
+                        assigneeId: "3"
+                        assignee:
+                          id: "3"
+                          name: "Jane Doe"
+                          email: "jane@example.com"
+                        createdBy:
+                          id: "1"
+                          name: "Admin"
+                        sprint:
+                          id: "2"
+                          name: "Sprint 12"
+                        permissions:
+                          canEdit: true
+                          canUpdateStatus: true
+                          assignedToMe: true
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Ticket not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    patch:
+      tags: [Tickets]
+      summary: Update a ticket (admin only)
+      parameters:
+        - $ref: "#/components/parameters/TicketIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTicketRequest"
+            examples:
+              example:
+                value:
+                  title: "Fix login bug"
+                  priority: "CRITICAL"
+                  assigneeId: "3"
+      responses:
+        "200":
+          description: Ticket updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketDataResponse"
+        "403":
+          description: Admin access only
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Ticket not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      tags: [Tickets]
+      summary: Soft delete a ticket (admin only)
+      parameters:
+        - $ref: "#/components/parameters/TicketIdParam"
+      responses:
+        "200":
+          description: Ticket deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              examples:
+                success:
+                  value:
+                    success: true
+                    message: "Ticket deleted successfully"
+        "404":
+          description: Ticket not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /tickets:
+    post:
+      tags: [Tickets]
+      summary: Create a ticket (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTicketRequest"
+            examples:
+              example:
+                value:
+                  title: "Fix login bug"
+                  description: "Investigate token refresh"
+                  status: "TODO"
+                  priority: "HIGH"
+                  deadline: "2026-05-31T10:00:00.000Z"
+                  assigneeId: "3"
+                  sprintId: "2"
+      responses:
+        "201":
+          description: Ticket created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketDataResponse"
+        "403":
+          description: Admin access only
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /tickets/{id}/status:
+    patch:
+      tags: [Tickets]
+      summary: Update ticket status
+      parameters:
+        - $ref: "#/components/parameters/TicketIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTicketStatusRequest"
+            examples:
+              example:
+                value:
+                  status: "IN_PROGRESS"
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketDataResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Invalid status transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /tickets/{id}/restore:
+    patch:
+      tags: [Tickets]
+      summary: Restore a soft-deleted ticket (admin only)
+      parameters:
+        - $ref: "#/components/parameters/TicketIdParam"
+      responses:
+        "200":
+          description: Ticket restored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              examples:
+                success:
+                  value:
+                    success: true
+                    message: "Ticket restored"
+        "404":
+          description: Ticket not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /tickets/permanent:
+    delete:
+      tags: [Tickets]
+      summary: Permanently delete all soft-deleted tickets (admin only)
+      responses:
+        "200":
+          description: Tickets permanently deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              examples:
+                success:
+                  value:
+                    success: true
+                    message: "Tickets permanently deleted"
+
+  /tickets/{id}/permanent:
+    delete:
+      tags: [Tickets]
+      summary: Permanently delete a ticket (admin only)
+      parameters:
+        - $ref: "#/components/parameters/TicketIdParam"
+      responses:
+        "200":
+          description: Ticket permanently deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              examples:
+                success:
+                  value:
+                    success: true
+                    message: "Ticket permanently deleted"
+        "400":
+          description: Ticket is not deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /tickets/{id}/comments:
+    get:
+      tags: [Comments]
+      summary: Get comments for a ticket
+      parameters:
+        - $ref: "#/components/parameters/TicketIdParam"
+      responses:
+        "200":
+          description: Comment list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Comment"
+              examples:
+                success:
+                  value:
+                    success: true
+                    data:
+                      - id: "10"
+                        content: "Investigating now."
+                        createdAt: "2026-05-05T10:00:00.000Z"
+                        updatedAt: "2026-05-05T10:00:00.000Z"
+                        author:
+                          id: "3"
+                          name: "Jane Doe"
+                          email: "jane@example.com"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Ticket not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      tags: [Comments]
+      summary: Add a comment to a ticket
+      parameters:
+        - $ref: "#/components/parameters/TicketIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentRequest"
+            examples:
+              example:
+                value:
+                  content: "Investigating now."
+      responses:
+        "201":
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Comment"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /tickets/{id}/audit:
+    get:
+      tags: [Audit]
+      summary: Get audit log for a ticket (admin only)
+      parameters:
+        - $ref: "#/components/parameters/TicketIdParam"
+      responses:
+        "200":
+          description: Audit log list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditLog"
+              examples:
+                success:
+                  value:
+                    items:
+                      - id: "1"
+                        action: "TICKET_CREATED"
+                        actorRole: "ADMIN"
+                        oldValue: null
+                        newValue:
+                          status: "TODO"
+                        createdAt: "2026-05-01T10:00:00.000Z"
+                        user:
+                          id: "1"
+                          name: "Admin"
+                          email: "admin@example.com"
+        "403":
+          description: Admin access only
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Ticket not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /profile:
+    get:
+      tags: [Profile]
+      summary: Get current user profile
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/User"
+      security:
+        - bearerAuth: []
+
+    put:
+      tags: [Profile]
+      summary: Update profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/User"
+        "409":
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - bearerAuth: []
+
+  /profile/password:
+    put:
+      tags: [Profile]
+      summary: Change password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    nullable: true
+        "401":
+          description: Invalid current password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - bearerAuth: []
+
+  /admin/users:
+    get:
+      tags: [Profile]
+      summary: List users (admin only)
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitAdminParam"
+      responses:
+        "200":
+          description: User list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    required: [users, total, page, limit]
+                    properties:
+                      users:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/UserSummary"
+                      total:
+                        type: integer
+                      page:
+                        type: integer
+                      limit:
+                        type: integer
+      security:
+        - bearerAuth: []
+
+  /sprints/create:
+    post:
+      tags: [Sprints]
+      summary: Create a sprint (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSprintRequest"
+      responses:
+        "201":
+          description: Sprint created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Sprint"
+      security:
+        - bearerAuth: []
+
+  /sprints/update/{id}:
+    patch:
+      tags: [Sprints]
+      summary: Update a sprint (admin only)
+      parameters:
+        - $ref: "#/components/parameters/ReportSprintIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSprintRequest"
+      responses:
+        "200":
+          description: Sprint updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/Sprint"
+      security:
+        - bearerAuth: []
+
+  /sprints:
+    get:
+      tags: [Sprints]
+      summary: List sprints
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Sprint list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    required: [items, paginationMeta]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/SprintSummary"
+                      paginationMeta:
+                        $ref: "#/components/schemas/PaginationMeta"
+      security:
+        - bearerAuth: []
+
+  /sprints/{id}:
+    get:
+      tags: [Sprints]
+      summary: Get sprint by ID
+      parameters:
+        - $ref: "#/components/parameters/ReportSprintIdParam"
+      responses:
+        "200":
+          description: Sprint details
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data]
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: "#/components/schemas/SprintDetail"
+        "403":
+          description: Access denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Sprint not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      security:
+        - bearerAuth: []
+
+    delete:
+      tags: [Sprints]
+      summary: Delete a sprint (admin only)
+      parameters:
+        - $ref: "#/components/parameters/ReportSprintIdParam"
+      responses:
+        "200":
+          description: Sprint deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              examples:
+                success:
+                  value:
+                    success: true
+                    message: "Sprint has been permanently deleted."
+      security:
+        - bearerAuth: []
+
+  /reports/admin:
+    get:
+      tags: [Reports]
+      summary: Get admin report (premium admin only)
+      parameters:
+        - $ref: "#/components/parameters/DateFromParam"
+        - $ref: "#/components/parameters/DateToParam"
+        - $ref: "#/components/parameters/ReportStatusParam"
+        - $ref: "#/components/parameters/ReportAssigneeParam"
+        - $ref: "#/components/parameters/ReportSprintIdParam"
+      responses:
+        "200":
+          description: Admin report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminReportResponse"
+      security:
+        - bearerAuth: []
+
+  /reports/admin/export:
+    get:
+      tags: [Export]
+      summary: Export admin report as CSV (premium admin only)
+      parameters:
+        - $ref: "#/components/parameters/DateFromParam"
+        - $ref: "#/components/parameters/DateToParam"
+        - $ref: "#/components/parameters/ReportStatusParam"
+        - $ref: "#/components/parameters/ReportAssigneeParam"
+        - $ref: "#/components/parameters/ReportSprintIdParam"
+        - $ref: "#/components/parameters/ReportPageParam"
+        - $ref: "#/components/parameters/ReportLimitParam"
+      responses:
+        "200":
+          description: CSV stream
+          content:
+            text/csv:
+              schema:
+                type: string
+              examples:
+                sample:
+                  value: "Ticket ID,Title,Status\n101,Fix login bug,IN_PROGRESS\n"
+      security:
+        - bearerAuth: []
+
+  /reports/me:
+    get:
+      tags: [Reports]
+      summary: Get current user report
+      parameters:
+        - $ref: "#/components/parameters/DateFromParam"
+        - $ref: "#/components/parameters/DateToParam"
+        - $ref: "#/components/parameters/ReportStatusParam"
+        - $ref: "#/components/parameters/ReportSprintIdParam"
+      responses:
+        "200":
+          description: User report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserReportResponse"
+      security:
+        - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    TicketIdParam:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        pattern: "^\\d+$"
+      description: Ticket ID
+    SprintIdParam:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        pattern: "^\\d+$"
+      description: Sprint ID
+    ViewParam:
+      in: query
+      name: view
+      schema:
+        type: string
+        enum: [sprint, scoped, all]
+    StatusParam:
+      in: query
+      name: status
+      description: Comma-separated list or single value
+      schema:
+        oneOf:
+          - type: string
+            enum: [SCOPED_BACKLOG, SPRINT_BACKLOG, TODO, IN_PROGRESS, DONE, TESTED, STAGED, DEPLOYED]
+          - type: array
+            items:
+              type: string
+              enum: [SCOPED_BACKLOG, SPRINT_BACKLOG, TODO, IN_PROGRESS, DONE, TESTED, STAGED, DEPLOYED]
+        example: "TODO,IN_PROGRESS"
+      style: form
+      explode: false
+    PriorityParam:
+      in: query
+      name: priority
+      schema:
+        type: string
+        enum: [LOW, MEDIUM, HIGH, CRITICAL]
+    SortByParam:
+      in: query
+      name: sortBy
+      schema:
+        type: string
+        enum: [createdAt, updatedAt, priority, deadline, status]
+    SearchParam:
+      in: query
+      name: search
+      schema:
+        type: string
+        maxLength: 100
+    AssigneeParam:
+      in: query
+      name: assignee
+      schema:
+        type: integer
+        minimum: 1
+    SprintIdParamQuery:
+      in: query
+      name: sprintId
+      schema:
+        type: string
+        pattern: "^\\d+$"
+      description: Sprint ID
+    StartDateParam:
+      in: query
+      name: startDate
+      schema:
+        type: string
+        format: date
+    EndDateParam:
+      in: query
+      name: endDate
+      schema:
+        type: string
+        format: date
+    DeletedOnlyParam:
+      in: query
+      name: deletedOnly
+      schema:
+        type: boolean
+    IncludeDeletedParam:
+      in: query
+      name: includeDeleted
+      schema:
+        type: boolean
+    PageParam:
+      in: query
+      name: page
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    LimitParam:
+      in: query
+      name: limit
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 20
+        default: 20
+    LimitAdminParam:
+      in: query
+      name: limit
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    DateFromParam:
+      in: query
+      name: date_from
+      schema:
+        type: string
+        format: date
+    DateToParam:
+      in: query
+      name: date_to
+      schema:
+        type: string
+        format: date
+    ReportStatusParam:
+      in: query
+      name: status
+      schema:
+        type: string
+        enum: [SCOPED_BACKLOG, SPRINT_BACKLOG, TODO, IN_PROGRESS, DONE, TESTED, STAGED, DEPLOYED]
+    ReportAssigneeParam:
+      in: query
+      name: assignee_id
+      schema:
+        type: string
+        pattern: "^\\d+$"
+    ReportPageParam:
+      in: query
+      name: page
+      schema:
+        type: integer
+        minimum: 1
+    ReportLimitParam:
+      in: query
+      name: limit
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 5000
+    ReportSprintIdParam:
+      in: query
+      name: sprint_id
+      schema:
+        type: string
+        pattern: "^\\d+$"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "Invalid token"
+
+    UserSummary:
+      type: object
+      required: [id, name, email]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [ADMIN, USER]
+
+    User:
+      type: object
+      required: [id, name, email, role]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [ADMIN, USER]
+        plan:
+          type: string
+          enum: [FREE, PREMIUM]
+        createdAt:
+          type: string
+          format: date-time
+
+    TicketPermissionFlags:
+      type: object
+      required: [canEdit, canUpdateStatus, assignedToMe]
+      properties:
+        canEdit:
+          type: boolean
+        canUpdateStatus:
+          type: boolean
+        assignedToMe:
+          type: boolean
+
+    Ticket:
+      type: object
+      required: [id, title, status, priority, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [SCOPED_BACKLOG, SPRINT_BACKLOG, TODO, IN_PROGRESS, DONE, TESTED, STAGED, DEPLOYED]
+        priority:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        deadline:
+          type: string
+          format: date-time
+          nullable: true
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        assigneeId:
+          type: string
+          nullable: true
+        assignee:
+          $ref: "#/components/schemas/UserSummary"
+        createdBy:
+          type: object
+          required: [id, name]
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+        sprint:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+        permissions:
+          $ref: "#/components/schemas/TicketPermissionFlags"
+
+    TicketListResponse:
+      type: object
+      required: [success, items, paginationMeta]
+      properties:
+        success:
+          type: boolean
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Ticket"
+        paginationMeta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    TicketSingleResponse:
+      type: object
+      required: [success, items]
+      properties:
+        success:
+          type: boolean
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Ticket"
+
+    TicketDataResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: "#/components/schemas/Ticket"
+
+    PaginationMeta:
+      type: object
+      required: [total, page, limit, totalPages]
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+        hasNextPage:
+          type: boolean
+        hasPrevPage:
+          type: boolean
+
+    Comment:
+      type: object
+      required: [id, content, createdAt, updatedAt, author]
+      properties:
+        id:
+          type: string
+        content:
+          type: string
+          maxLength: 500
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        author:
+          $ref: "#/components/schemas/UserSummary"
+
+    AuditLog:
+      type: object
+      required: [id, action, actorRole, createdAt, user]
+      properties:
+        id:
+          type: string
+        action:
+          type: string
+          enum: [TICKET_CREATED, TICKET_UPDATED, STATUS_CHANGED, TICKET_DELETED, TICKET_RESTORED, COMMENT_ADDED]
+        actorRole:
+          type: string
+          enum: [ADMIN, USER]
+        oldValue:
+          nullable: true
+        newValue:
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        user:
+          $ref: "#/components/schemas/UserSummary"
+
+    Sprint:
+      type: object
+      required: [id, name, startDate, endDate, isActive]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    SprintSummary:
+      type: object
+      required: [id, name, startDate, endDate, isActive]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        isActive:
+          type: boolean
+        _count:
+          type: object
+          properties:
+            tickets:
+              type: integer
+
+    SprintDetail:
+      type: object
+      required: [id, name, startDate, endDate, isActive, tickets]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        isActive:
+          type: boolean
+        tickets:
+          type: array
+          items:
+            type: object
+            required: [id, title, status, priority]
+            properties:
+              id:
+                type: string
+              title:
+                type: string
+              status:
+                type: string
+                enum: [SCOPED_BACKLOG, SPRINT_BACKLOG, TODO, IN_PROGRESS, DONE, TESTED, STAGED, DEPLOYED]
+              priority:
+                type: string
+                enum: [LOW, MEDIUM, HIGH, CRITICAL]
+              assigneeId:
+                type: string
+                nullable: true
+              assignee:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+        _count:
+          type: object
+          properties:
+            tickets:
+              type: integer
+
+    AdminReportResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            summary:
+              type: object
+              properties:
+                total:
+                  type: integer
+                completed:
+                  type: integer
+                in_progress:
+                  type: integer
+                overdue:
+                  type: integer
+                period_delta:
+                  type: object
+                  properties:
+                    total:
+                      type: number
+                      nullable: true
+                    completed:
+                      type: number
+                      nullable: true
+                    in_progress:
+                      type: number
+                      nullable: true
+                    overdue:
+                      type: number
+                      nullable: true
+            chart:
+              type: array
+              items:
+                type: object
+                properties:
+                  week:
+                    type: string
+                  completed:
+                    type: integer
+                  in_progress:
+                    type: integer
+                  overdue:
+                    type: integer
+            members:
+              type: array
+              items:
+                type: object
+                properties:
+                  user_id:
+                    type: string
+                  name:
+                    type: string
+                  assigned:
+                    type: integer
+                  completed:
+                    type: integer
+                  in_progress:
+                    type: integer
+                  overdue:
+                    type: integer
+                  completion_rate:
+                    type: number
+            filters_applied:
+              type: object
+              properties:
+                date_range:
+                  type: object
+                  nullable: true
+                  properties:
+                    from:
+                      type: string
+                    to:
+                      type: string
+                status:
+                  type: string
+                  nullable: true
+                assignee_id:
+                  type: string
+                  nullable: true
+                sprint_id:
+                  type: string
+                  nullable: true
+
+    UserReportResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            summary:
+              type: object
+              properties:
+                my_tickets:
+                  type: integer
+                completed:
+                  type: integer
+                overdue:
+                  type: integer
+                completion_rate:
+                  type: number
+            recent_tickets:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  title:
+                    type: string
+                  priority:
+                    type: string
+                    enum: [LOW, MEDIUM, HIGH, CRITICAL]
+                  status:
+                    type: string
+                    enum: [SCOPED_BACKLOG, SPRINT_BACKLOG, TODO, IN_PROGRESS, DONE, TESTED, STAGED, DEPLOYED]
+                  sprint:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: string
+
+
+                      label:
+                        type: string
+                  deadline:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  is_overdue:
+                    type: boolean
+            delta:
+              type: object
+              properties:
+                total:
+                  type: number
+                  nullable: true
+                completed:
+                  type: number
+                  nullable: true
+                in_progress:
+                  type: number
+                  nullable: true
+                overdue:
+                  type: number
+                  nullable: true
+            filters_applied:
+              type: object
+              properties:
+                date_range:
+                  type: object
+                  nullable: true
+                  properties:
+                    from:
+                      type: string
+                    to:
+                      type: string
+                status:
+                  type: string
+                  nullable: true
+                sprint_id:
+                  type: string
+                  nullable: true
+
+    MessageResponse:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        password:
+          type: string
+          minLength: 8
+          maxLength: 100
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    ForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    ResetPasswordRequest:
+      type: object
+      required: [token, newPassword]
+      properties:
+        token:
+          type: string
+        newPassword:
+          type: string
+          minLength: 8
+          maxLength: 100
+
+    CreateTicketRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 10000
+          nullable: true
+        status:
+          type: string
+          enum: [SCOPED_BACKLOG, SPRINT_BACKLOG, TODO, IN_PROGRESS, DONE, TESTED, STAGED, DEPLOYED]
+        priority:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        deadline:
+          type: string
+          format: date-time
+          nullable: true
+        assigneeId:
+          type: string
+          pattern: "^\\d+$"
+          nullable: true
+        sprintId:
+          type: string
+          pattern: "^\\d+$"
+          nullable: true
+
+    UpdateTicketRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 10000
+          nullable: true
+        status:
+          type: string
+          enum: [SCOPED_BACKLOG, SPRINT_BACKLOG, TODO, IN_PROGRESS, DONE, TESTED, STAGED, DEPLOYED]
+        priority:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        deadline:
+          type: string
+          format: date-time
+          nullable: true
+        assigneeId:
+          type: string
+          pattern: "^\\d+$"
+          nullable: true
+        sprintId:
+          type: string
+          pattern: "^\\d+$"
+          nullable: true
+
+    UpdateTicketStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [SCOPED_BACKLOG, SPRINT_BACKLOG, TODO, IN_PROGRESS, DONE, TESTED, STAGED, DEPLOYED]
+
+    CreateCommentRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 500
+
+    UpdateProfileRequest:
+      type: object
+      required: [name, email]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          maxLength: 255
+
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword, confirmPassword]
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 8
+          maxLength: 100
+        confirmPassword:
+          type: string
+
+    CreateSprintRequest:
+      type: object
+      required: [name, startDate, endDate]
+      properties:
+        name:
+          type: string
+          minLength: 4
+          maxLength: 100
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+
+    UpdateSprintRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 4
+          maxLength: 100
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+
+    AuthResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          required: [user, accessToken]
+          properties:
+            user:
+              $ref: "#/components/schemas/User"
+            accessToken:
+              type: string
