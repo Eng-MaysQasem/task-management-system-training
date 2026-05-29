@@ -15,7 +15,7 @@ router.use(authMiddleware)
 router.get(
   "/admin",
   isAdmin,
-  isPremium,
+  //isPremium,
   validate({ query: adminReportSchema }),
   reportsController.getAdminReport,
 );
@@ -23,7 +23,7 @@ router.get(
 router.get(
   "/admin/export",
   isAdmin,
-  isPremium,
+ // isPremium,
   validate({ query: adminExportSchema }),
   reportsController.getAdminReportExport,
 );
