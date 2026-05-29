@@ -4,8 +4,8 @@ info:
   version: 1.0.0
   description: OpenAPI documentation for the Task Management System backend.
 servers:
-  - url: http://localhost:3000
-    description: Local development server
+  - url: https://task-management-system-training-production.up.railway.app
+    description: Production server
 
 security:
   - bearerAuth: []
@@ -19,8 +19,49 @@ tags:
   - name: Reports
   - name: Export
   - name: Sprints
+  - name: Health
 
 paths:
+  /health:
+    get:
+      summary: Health check
+      description: Returns server status, database connectivity, and timestamp
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  database:
+                    type: string
+                    example: connected
+                  timeStamp:
+                    type: integer
+                    example: 1716900000000
+        "500":
+          description: Server or database error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  database:
+                    type: string
+                    example: disconnected
+                  timeStamp:
+                    type: integer
+                    example: 1716900000000
+
   /auth/register:
     post:
       tags: [Auth]

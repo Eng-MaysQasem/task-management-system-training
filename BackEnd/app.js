@@ -7,6 +7,7 @@ const cors = require('cors');
 const fs = require('fs');
 const swaggerUi = require('swagger-ui-express');
 const YAML = require('yaml');
+const helmet = require('helmet');
 require("./Modules/tickets/tickets.cleanup.job");
 
 
@@ -16,9 +17,10 @@ var usersRouter = require('./routes/users');
 var app = express();
 
 app.use(cors({
-  origin: "http://localhost:5173",   
+  origin: process.env.FRONTEND_URL,   
   credentials: true,                 
 }));
+app.use(helmet());
 
 const healthRouter = require('./Modules/health');
 const authRouter = require('./Modules/auth/auth.routes');
