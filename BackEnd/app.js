@@ -26,6 +26,7 @@ const healthRouter = require('./Modules/health');
 const authRouter = require('./Modules/auth/auth.routes');
 const ticketsRouter = require('./Modules/tickets/tickets.route');
 const sprintRouter = require('./Modules/sprints/sprints.route')
+const projectsRouter = require('./Modules/projects/projects.routes');
 const userRouter = require('./Modules/user/user.routes');
 const adminRouter = require("./Modules/user/admin.routes")
 const reportRouter = require("./Modules/reports/reports.routes")
@@ -52,6 +53,7 @@ app.use('', healthRouter);
 app.use('/auth', authRouter);
 app.use('/tickets', ticketsRouter);
 app.use('/sprints', sprintRouter)
+app.use('/projects', projectsRouter);
 app.use('/profile', userRouter);
 app.use('/admin', adminRouter)
 app.use('/reports', reportRouter)
