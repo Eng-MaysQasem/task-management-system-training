@@ -4,6 +4,7 @@ const create = async (payload) => {
   return await prisma.sprint.create({
     data: {
       name: payload.name,
+      projectId: payload.projectId,
       startDate: payload.startDate,
       endDate: payload.endDate,
       createdAt: new Date(),
@@ -43,16 +44,19 @@ const update = async (id, data) => {
   });
 };
 
-const findAll = async (page, limit, user) => {
+const findAll = async (page, limit, user, projectId) => {
   let where = {};
   const ticketsWhere = { deletedAt: null };
+  
+  if (projectId) {
+    where.projectId = projectId;
+  }
+  
   if (user.role !== "ADMIN") {
-    where = {
-      tickets: {
-        some: {
-          assigneeId: BigInt(user.id),
-          deletedAt: null,
-        },
+    where.tickets = {
+      some: {
+        assigneeId: BigInt(user.id),
+        deletedAt: null,
       },
     };
     ticketsWhere.assigneeId = BigInt(user.id);
@@ -69,6 +73,7 @@ const findAll = async (page, limit, user) => {
       select: {
         id: true,
         name: true,
+        projectId: true,
         startDate: true,
         endDate: true,
         isActive: true,
@@ -102,6 +107,12 @@ const findOne = async (id, user) => {
   const sprint = await prisma.sprint.findUnique({
     where: { id },
     include: {
+      project: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
       tickets: {
         where: ticketsWhere,
         select: {

@@ -2,7 +2,11 @@ const sprintService = require("./sprints.service");
 
 const create = async (req, res, next) => {
   try {
-    const created = await sprintService.create(req.body);
+    const payload = {
+      ...req.body,
+      projectId: BigInt(req.body.projectId),
+    };
+    const created = await sprintService.create(payload);
     res.status(201).json({ success: true, data: created });
   } catch (err) {
     next(err);
@@ -21,9 +25,9 @@ const update = async (req, res, next) => {
 
 const getSprints = async (req, res, next) => {
   try {
-    const { page, limit } = req.query;
+    const { page, limit, projectId } = req.query;
     const user = req.user;
-    const data = await sprintService.findAll(page, limit, user);
+    const data = await sprintService.findAll(page, limit, user, projectId ? BigInt(projectId) : undefined);
     res.status(200).json({
       success: true,
       data: data,
@@ -36,7 +40,7 @@ const getSprints = async (req, res, next) => {
 const getById = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const sprint = await sprintService.findOne(id, req.user);
+    const sprint = await sprintService.findOne(BigInt(id), req.user);
     
     res.status(200).json({
       success: true,
