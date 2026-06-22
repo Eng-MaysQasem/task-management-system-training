@@ -98,13 +98,15 @@ model Ticket {
   assigneeId  BigInt?
   createdById BigInt
   sprintId    BigInt?
+  projectId   BigInt
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
   assignee    User?        @relation("AssignedTickets", fields: [assigneeId], references: [id], onDelete: SetNull)
   createdBy   User         @relation("CreatedTickets", fields: [createdById], references: [id])
   sprint      Sprint?      @relation(fields: [sprintId], references: [id], onDelete: SetNull)
-  
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade) 
+
   labels      TicketLabel[]
   comments    Comment[]
   auditLogs   AuditLog[]
@@ -113,11 +115,13 @@ model Ticket {
   @@index([createdById])
   @@index([sprintId])
   @@index([status])
+  @@index([projectId])
   @@map("tickets")
 }
 
 model Sprint {
   id        BigInt      @id @default(autoincrement())
+  projectId BigInt
   name      String   @db.VarChar(100)
   startDate DateTime
   endDate   DateTime
@@ -125,8 +129,10 @@ model Sprint {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tickets Ticket[]
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
+  tickets Ticket[]
+  @@index([projectId])
   @@map("sprints")
 }
 
@@ -171,6 +177,22 @@ model PasswordResetToken {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+
+model Project {
+  id          BigInt   @id @default(autoincrement())
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  isActive    Boolean   @default(true)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sprints     Sprint[]
+  tickets     Ticket[]
+
+  @@map("projects")
 }
 
 // Phase 2 – not active yet
