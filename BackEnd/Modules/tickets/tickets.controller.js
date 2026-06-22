@@ -16,6 +16,7 @@ const getTickets = async (req, res, next) => {
       search,
       deletedOnly,
       includeDeleted,
+      projectId,
       sprintId,
     } = req.query;
 
@@ -33,6 +34,7 @@ const getTickets = async (req, res, next) => {
       search,
       deletedOnly,
       includeDeleted,
+      projectId,
       sprintId,
     });
     const resultWithFlags = attachPermissionFlags(result, req.user);
@@ -66,6 +68,7 @@ const addTicket = async (req, res, next) => {
     const {
       title,
       description,
+      projectId,
       status,
       priority,
       deadline,
@@ -75,6 +78,7 @@ const addTicket = async (req, res, next) => {
     const payload = {
       title,
       description,
+      projectId,
       status,
       priority,
       deadline: deadline ? new Date(deadline) : null,

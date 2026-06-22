@@ -31,6 +31,7 @@ const createSprintSchema = z
 
 const updateSprintSchema = z
   .object(sprintShape)
+  .omit({"projectId": true})
   .partial()
   .refine(
     (data) => {

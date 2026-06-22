@@ -19,6 +19,7 @@ const getTicketsSchema = z.object({
     sortBy: z.enum(Object.values(sortEnum)).optional(),
     search:z.string().trim().max(100).optional(),
     assignee: z.coerce.number().int().positive().optional(),
+    projectId: bigIntIdSchema.optional(),
     sprintId: bigIntIdSchema.optional(),
     startDate: z.coerce.date().optional(),
     endDate: z.coerce.date().optional(),

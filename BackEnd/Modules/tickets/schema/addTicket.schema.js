@@ -5,6 +5,7 @@ const { bigIntIdSchema } = require("../../utils/schema.utils");
 const addTicketSchema = z.object({
   title: z.string().min(1, "Title is required").max(100, "Title too long"),
   description: z.string().max(10000, "description too long").optional(),
+  projectId: bigIntIdSchema,
   status: z.enum(Object.values(TicketStatus)).optional(),
   priority: z.enum(Object.values(Priority)).optional(),
   deadline: z

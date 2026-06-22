@@ -9,6 +9,7 @@ const getTickets = async (filters) => {
     view,
     status,
     assignee,
+    projectId,
     priority,
     startDate,
     endDate,
@@ -38,6 +39,9 @@ const getTickets = async (filters) => {
     where.deletedAt = null;
   } else {
     if (assignee) where.assigneeId = BigInt(assignee);
+  }
+  if (projectId) {
+    where.projectId = BigInt(projectId);
   }
   if (sprintId) {
     where.sprintId = BigInt(sprintId);
@@ -84,6 +88,7 @@ const getTickets = async (filters) => {
         deletedAt: true,
         createdAt: true,
         updatedAt: true,
+        project: { select: { id: true, name: true } },
         assignee: { select: { id: true, name: true, email: true } },
         createdBy: { select: { id: true, name: true } },
         sprint: { select: { id: true, name: true } },
@@ -116,6 +121,7 @@ const getTicketById = async (id, user) => {
       createdAt: true,
       updatedAt: true,
       assigneeId: true,
+      project: { select: { id: true, name: true } },
       assignee: { select: { id: true, name: true, email: true } },
       createdBy: { select: { id: true, name: true } },
       sprint: { select: { id: true, name: true } },
@@ -154,18 +160,43 @@ const getTicketById = async (id, user) => {
 };
 
 const createTicket = async (payload, actor) => {
-  const { sprintId, assigneeId, ...details } = payload;
+  const { sprintId, assigneeId, projectId, ...details } = payload;
 
   return await prisma.$transaction(async (tx) => {
+    // If a sprint is provided, verify it belongs to the same project
+    if (sprintId) {
+      const sprint = await tx.sprint.findUnique({
+        where: { id: sprintId },
+        select: { projectId: true },
+      });
+
+      if (!sprint) {
+        const err = new Error(`Sprint ${sprintId} not found.`);
+        err.status = 404;
+        throw err;
+      }
+
+      if (sprint.projectId !== BigInt(projectId)) {
+        const err = new Error(
+          `Sprint ${sprintId} does not belong to project ${projectId}.`,
+        );
+        err.status = 422;
+        throw err;
+      }
+    }
+
     const ticket = await tx.ticket.create({
       data: {
         ...details,
+        project: { connect: { id: projectId } },
         createdBy: { connect: { id: BigInt(actor.id) } },
         assignee: assigneeId ? { connect: { id: assigneeId } } : undefined,
         sprint: sprintId ? { connect: { id: sprintId } } : undefined,
       },
       include: {
+        project: { select: { id: true, name: true } },
         assignee: { select: { id: true, name: true, email: true } },
+        sprint: { select: { id: true, name: true } },
       },
     });
 
@@ -179,6 +210,7 @@ const createTicket = async (payload, actor) => {
         status: ticket.status,
         priority: ticket.priority,
         deadline: ticket.deadline,
+        projectId: projectId?.toString() ?? null,
         assigneeId: assigneeId?.toString() ?? null,
         sprintId: sprintId?.toString() ?? null,
       },
@@ -234,7 +266,9 @@ const updateTicket = async (id, payload, actor) => {
       where: { id },
       data,
       include: {
+        project: { select: { id: true, name: true } },
         assignee: { select: { id: true, name: true, email: true } },
+        sprint: { select: { id: true, name: true } },
       },
     });
 
@@ -248,6 +282,7 @@ const updateTicket = async (id, payload, actor) => {
         description: old.description,
         priority: old.priority,
         deadline: old.deadline,
+        projectId: old.projectId?.toString() ?? null,
         assigneeId: old.assigneeId?.toString() ?? null,
         sprintId: old.sprintId?.toString() ?? null,
       },
@@ -256,6 +291,7 @@ const updateTicket = async (id, payload, actor) => {
         description: updated.description,
         priority: updated.priority,
         deadline: updated.deadline,
+        projectId: updated.projectId?.toString() ?? null,
         assigneeId: updated.assigneeId?.toString() ?? null,
         sprintId: updated.sprintId?.toString() ?? null,
       },
