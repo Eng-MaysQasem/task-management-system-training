@@ -208,10 +208,39 @@ const listProjects = async (actor, pagination = {}) => {
   };
 };
 
+const deleteProject = async (id, actor) => {
+  const project = await prisma.project.findUnique({
+    where: { id: BigInt(id) },
+  });
+
+  if (!project) {
+    const err = new Error("Project not found");
+    err.status = 404;
+    throw err;
+  }
+
+  return await prisma.$transaction(async (tx) => {
+    await tx.ticket.deleteMany({
+      where: { projectId: BigInt(id) },
+    });
+
+    await tx.sprint.deleteMany({
+      where: { projectId: BigInt(id) },
+    });
+
+    const deleted = await tx.project.delete({
+      where: { id: BigInt(id) },
+    });
+
+    return deleted;
+  });
+};
+
 module.exports = {
   createProject,
   updateProject,
   listProjects,
+  deleteProject,
   resolveIsActive,
   serializeProject,
 };

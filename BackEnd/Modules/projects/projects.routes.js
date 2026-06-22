@@ -30,4 +30,11 @@ router.patch(
   projectController.updateProject,
 );
 
+router.delete(
+  "/:id",
+  isAdmin,
+  validate({ params: updateProjectParamSchema }),
+  projectController.deleteProject,
+);
+
 module.exports = router;
